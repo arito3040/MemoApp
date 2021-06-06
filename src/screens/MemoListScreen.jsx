@@ -1,16 +1,53 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
+import firebase from 'firebase';
 
-import AppBar from '../components/AppBar';
 import MemoList from '../components/MemoList';
 import CircleButton from '../components/CircleButton';
+import LogOutButton from '../components/LogOutButton';
 
-export default function MemoListScreen() {
+export default function MemoListScreen(props) {
+  const { navigation } = props;
+  const [memos, setMemos] = useState([]);
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <LogOutButton />,
+    });
+  }, []);
+
+  useEffect(() => {
+    const db = firebase.firestore();
+    const { currentUser } = firebase.auth();
+    let unsubscribe = () => {};
+    if (currentUser) {
+      const ref = db.collection(`users/${currentUser.uid}/memos`).orderBy('updatedAt', 'desc');
+      unsubscribe = ref.onSnapshot((snapshot) => {
+        const userMemos = [];
+        snapshot.forEach((doc) => {
+          console.log(doc.id, doc.data());
+          const data = doc.data();
+          userMemos.push({
+            id: doc.id,
+            bodyText: data.bodyText,
+            updatedAt: data.updatedAt.toData(),
+          });
+        });
+        setMemos(userMemos);
+      }, (error) => {
+        console.log(error);
+        Alert.alert('データの読み込みに失敗しました。');
+      });
+    }
+    return unsubscribe;
+  }, []);
+
   return (
     <View style={styles.container}>
-      <AppBar />
-      <MemoList />
-      <CircleButton name="plus" />
+      <MemoList memos={memos} />
+      <CircleButton
+        name="plus"
+        onPress={() => { navigation.navigate('MemoCreate'); }}
+      />
     </View>
   );
 }
